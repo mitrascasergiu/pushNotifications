@@ -34,7 +34,6 @@
           userVisibleOnly: true
         }).then(function(sub) {
           var subscription = JSON.stringify(sub);
-          alert(subscription);
 
           var encryptionHelper = window.gauntface.EncryptionHelperFactory.generateHelper();
           encryptionHelper.getRequestDetails(sub, "")
