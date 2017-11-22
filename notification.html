@@ -1,10 +1,12 @@
 <html>
-  <head>
-    <title>Test Site</title>
-  </head>
-  <body bgcolor=white>
-	<h1>Test</h1>   
-	
+
+<head>
+  <title>Test Site</title>
+</head>
+
+<body bgcolor=white>
+  <h1>Test</h1>
+
   <button type="button" onclick="enableNotification();">Enable notifications!</button>
 
   <script src="./scripts/constants.js"></script>
@@ -24,66 +26,91 @@
   <script src="https://vcisaasintegrationsa.blob.core.windows.net/modules/tag.js"></script>
 
   <script>
-  
-  const BACKEND_ORIGIN = `https://simple-push-demo.appspot.com`;
-  
-  function enableNotification() {
-    navigator.serviceWorker.getRegistration()
-      .then(function(reg) {
-        reg.pushManager.subscribe({
-          userVisibleOnly: true
-        }).then(function(sub) {
-          var subscription = JSON.stringify(sub);
 
-          var encryptionHelper = window.gauntface.EncryptionHelperFactory.generateHelper();
-          encryptionHelper.getRequestDetails(sub, "")
-              .then((requestDetails) => {
-                return this.sendRequestToProxyServer(requestDetails);
-              });
+    const BACKEND_ORIGIN = `https://simple-push-demo.appspot.com`;
+
+    function enableNotification() {
+      navigator.serviceWorker.ready
+        .then(function (reg) {
+          reg.pushManager.getSubscription()
+            .then(function (sub) {
+              if (sub === undefined || sub === null) {
+                //ask user to register for push
+                console.log('The subscription is undefined');
+                navigator.serviceWorker.getRegistration()
+                  .then(function (reg) {
+                    reg.pushManager.subscribe({
+                      userVisibleOnly: true
+                    }).then(function (sub) {
+                      this.sendNotification(sub);
+                    });
+                  });
+              } else {
+                //you have the subscription, send notification
+                console.log('I have the subscription.');
+                console.log(JSON.stringify(sub));
+
+                this.sendNotification(sub);
+
+                //update the subscription
+              }
+            });
         });
-      });
-  }
-
-  function sendRequestToProxyServer(requestInfo) {
-    console.log('Sending XHR Proxy Server', requestInfo);
-
-    const fetchOptions = {
-      method: 'post',
-    };
-
-    // Can't send a stream like is needed for web push protocol,
-    // so needs to convert it to base 64 here and the server will
-    // convert back and pass as a stream
-    if (requestInfo.body && requestInfo.body instanceof ArrayBuffer) {
-      requestInfo.body = this.toBase64(requestInfo.body);
-      fetchOptions.body = requestInfo;
     }
 
-    fetchOptions.body = JSON.stringify(requestInfo);
+    function sendNotification(sub) {
+      var subscription = JSON.stringify(sub);
 
-    fetch(`${BACKEND_ORIGIN}/api/v2/sendpush`, fetchOptions)
-    .then(function(response) {
-      if (response.status >= 400 && response.status < 500) {
-        return response.text()
-        .then((responseText) => {
-          console.log('Failed web push response: ', response, response.status);
-        throw new Error(`Failed to send push message via web push protocol: ` +
-          `<pre>${encodeURI(responseText)}</pre>`);
+      var encryptionHelper = window.gauntface.EncryptionHelperFactory.generateHelper();
+
+      encryptionHelper.getRequestDetails(sub, "")
+        .then((requestDetails) => {
+          return this.sendRequestToProxyServer(requestDetails);
         });
+    }
+
+
+    function sendRequestToProxyServer(requestInfo) {
+      console.log('Sending XHR Proxy Server', requestInfo);
+
+      const fetchOptions = {
+        method: 'post',
+      };
+
+      // Can't send a stream like is needed for web push protocol,
+      // so needs to convert it to base 64 here and the server will
+      // convert back and pass as a stream
+      if (requestInfo.body && requestInfo.body instanceof ArrayBuffer) {
+        requestInfo.body = this.toBase64(requestInfo.body);
+        fetchOptions.body = requestInfo;
       }
-    })
-    .catch((err) => {
-      console.log(err);
-    });
-  }
 
-  function toBase64(arrayBuffer, start, end) {
-    start = start || 0;
-    end = end || arrayBuffer.byteLength;
+      fetchOptions.body = JSON.stringify(requestInfo);
 
-    const partialBuffer = new Uint8Array(arrayBuffer.slice(start, end));
-    return btoa(String.fromCharCode.apply(null, partialBuffer));
-  }
+      fetch(`${BACKEND_ORIGIN}/api/v2/sendpush`, fetchOptions)
+        .then(function (response) {
+          if (response.status >= 400 && response.status < 500) {
+            return response.text()
+              .then((responseText) => {
+                console.log('Failed web push response: ', response, response.status);
+                throw new Error(`Failed to send push message via web push protocol: ` +
+                  `<pre>${encodeURI(responseText)}</pre>`);
+              });
+          }
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    }
+
+    function toBase64(arrayBuffer, start, end) {
+      start = start || 0;
+      end = end || arrayBuffer.byteLength;
+
+      const partialBuffer = new Uint8Array(arrayBuffer.slice(start, end));
+      return btoa(String.fromCharCode.apply(null, partialBuffer));
+    }
   </script>
-  </body>
+</body>
+
 </html>
