@@ -1,89 +1,71 @@
 <html>
-  <head>
-    <title>Test Site</title>
-  </head>
-  <body bgcolor=white>
-	<h1>Test</h1>   
-	
+
+<head>
+  <title>Test Site</title>
+</head>
+
+<body bgcolor=white>
   <button type="button" onclick="enableNotification();">Enable notifications!</button>
+  <button type="button" onclick="sendNotification();">Send notification!</button>
 
-  <script src="./scripts/constants.js"></script>
-  <script src="./scripts/libs/idb-keyval.js"></script>
-  <script src="./scripts/libs/snippets.js"></script>
-
-  <script src="./scripts/encryption/hmac.js"></script>
-  <script src="./scripts/encryption/hkdf.js"></script>
-  <script src="./scripts/encryption/vapid-helper-1.js"></script>
-  <script src="./scripts/encryption/vapid-helper-2.js"></script>
-  <script src="./scripts/encryption/helpers.js"></script>
-
-  <script src="./scripts/encryption/encryption-aes-128-gcm.js"></script>
-  <script src="./scripts/encryption/encryption-aes-gcm.js"></script>
-  <script src="./scripts/encryption/encryption-factory.js"></script>
-
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
   <script src="https://vcisaasintegrationsa.blob.core.windows.net/modules/tag.js"></script>
 
   <script>
-  
-  const BACKEND_ORIGIN = `https://simple-push-demo.appspot.com`;
-  
-  function enableNotification() {
-    navigator.serviceWorker.getRegistration()
-      .then(function(reg) {
-        reg.pushManager.subscribe({
-          userVisibleOnly: true
-        }).then(function(sub) {
-          var subscription = JSON.stringify(sub);
+    const BACKEND_SERVER = 'https://d0de8131.ngrok.io';
 
-          var encryptionHelper = window.gauntface.EncryptionHelperFactory.generateHelper();
-          encryptionHelper.getRequestDetails(sub, "")
-              .then((requestDetails) => {
-                return this.sendRequestToProxyServer(requestDetails);
-              });
+    function enableNotification() {
+      navigator.serviceWorker.ready
+        .then(function (reg) {
+          reg.pushManager.getSubscription()
+            .then(function (sub) {
+              if (sub === undefined || sub === null) {
+                //ask user to register for push
+                console.log('The subscription is undefined');
+                navigator.serviceWorker.getRegistration()
+                  .then(function (reg) {
+                    reg.pushManager.subscribe({
+                      userVisibleOnly: true
+                    }).then(function (sub) {
+                      //store the subscription server side
+                      storeSubscription(sub);  
+                      alert("Subscription stored!");                     
+                    });
+                  });
+              } else {
+                console.log('I have the subscription.');
+                console.log(JSON.stringify(sub));
+
+                //store the subscription server side
+                storeSubscription(sub);  
+                alert("Subscription stored!");   
+              }
+            });
         });
-      });
-  }
-
-  function sendRequestToProxyServer(requestInfo) {
-    console.log('Sending XHR Proxy Server', requestInfo);
-
-    const fetchOptions = {
-      method: 'post',
-    };
-
-    // Can't send a stream like is needed for web push protocol,
-    // so needs to convert it to base 64 here and the server will
-    // convert back and pass as a stream
-    if (requestInfo.body && requestInfo.body instanceof ArrayBuffer) {
-      requestInfo.body = this.toBase64(requestInfo.body);
-      fetchOptions.body = requestInfo;
     }
 
-    fetchOptions.body = JSON.stringify(requestInfo);
+    function sendNotification() {
+        var uri = BACKEND_SERVER + "/api/subscription/send";
+        sendAjax(uri);
+    }
 
-    fetch(`${BACKEND_ORIGIN}/api/v2/sendpush`, fetchOptions)
-    .then(function(response) {
-      if (response.status >= 400 && response.status < 500) {
-        return response.text()
-        .then((responseText) => {
-          console.log('Failed web push response: ', response, response.status);
-        throw new Error(`Failed to send push message via web push protocol: ` +
-          `<pre>${encodeURI(responseText)}</pre>`);
-        });
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-    });
-  }
+    function storeSubscription(sub) {
+        var subObject = JSON.parse(JSON.stringify(sub));
+        var uri = BACKEND_SERVER + "/api/subscription/post?endpoint=" + subObject.endpoint + "&auth=" + subObject.keys.auth + "&p256dh=" + subObject.keys.p256dh;
+        sendAjax(uri);
+    }
 
-  function toBase64(arrayBuffer, start, end) {
-    start = start || 0;
-    end = end || arrayBuffer.byteLength;
-
-    const partialBuffer = new Uint8Array(arrayBuffer.slice(start, end));
-    return btoa(String.fromCharCode.apply(null, partialBuffer));
-  }
+    function sendAjax(uri) {
+       $.ajax({
+            url: uri,    
+            type: 'get',
+            dataType: "jsonp",
+            crossDomain: true   ,
+            contentType: "application/json",
+            async: false
+      });
+    }
   </script>
-  </body>
+</body>
+
 </html>
